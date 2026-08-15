@@ -1,0 +1,29 @@
+recipe_code,recipe_name,category,unit,material_cost_sar,labour_hours_per_unit,labour_rate_sar_per_hr,equipment_cost_sar,min_order_qty,standard_margin_pct,notes
+STG-DECK-1x1,Modular Stage Deck 1m x 1m (incl. legs & skirting),Staging,sqm,180,0.75,95,40,12,35,Height adjustable 0.4m-1.0m; price per square metre
+STG-RAMP-STD,Wheelchair Access Ramp for Stage,Staging,unit,650,2.5,95,120,1,35,Required for any public-facing stage per venue policy
+STG-STAIR-4T,Stage Stair Unit (4-tread with handrail),Staging,unit,420,1.5,95,80,1,35,
+LED-P39-IN,Indoor LED Screen P3.9 (incl. processor & rigging frame),LED & AV,sqm,950,1.2,140,310,6,28,Per sqm; includes signal processor share and spare modules
+LED-P26-IN,Indoor LED Screen P2.6 High-Res,LED & AV,sqm,1400,1.2,140,340,6,28,For close-viewing / premium ballroom events
+AV-PA-MED,PA Sound System - Medium (up to 500 pax),LED & AV,package,2800,6,140,1900,1,30,Includes 2x tops 2x subs mixer 4x wireless mics
+AV-PA-LRG,PA Sound System - Large (500-1500 pax),LED & AV,package,5200,10,140,3600,1,30,Line array; includes sound engineer for setup only
+AV-PROJ-15K,Projector 15K Lumens with Fast-Fold Screen,LED & AV,unit,1100,2,140,850,1,28,Screen up to 4m x 2.25m included
+LGT-WASH-LED,LED Wash Light (Moving Head),Lighting,unit,95,0.3,120,110,8,32,
+LGT-PROF-750,Profile Spot 750W,Lighting,unit,80,0.3,120,90,4,32,
+LGT-UPL-BAT,Battery Uplighter (Wireless),Lighting,unit,45,0.1,120,35,10,32,Colour programmable via app
+LGT-FOH-CONS,Lighting Console + Operator (per event day),Lighting,day,0,10,160,600,1,25,Operator mandatory for shows with cue programming
+TRS-BOX-3M,Box Truss 3m Section (290mm),Trussing & Rigging,unit,110,0.5,130,95,4,30,
+TRS-TOWER-6M,Ground Support Tower 6m,Trussing & Rigging,unit,480,3,130,420,2,30,Includes base plate and outriggers
+RIG-MOTOR-1T,Chain Hoist Motor 1 Tonne (incl. rigging hardware),Trussing & Rigging,unit,260,1.5,150,380,1,30,Venue rigging approval required
+FRN-CHR-BQT,Banquet Chair with Cover & Sash,Furniture,unit,18,0.05,85,0,50,40,
+FRN-TBL-RND,Round Table 1.8m (seats 10) with Linen,Furniture,unit,55,0.15,85,0,10,40,
+FRN-SOFA-LNG,Lounge Sofa Set (3-seater + 2 armchairs + coffee table),Furniture,set,380,0.5,85,60,1,40,
+FRN-CTL-HIGH,Cocktail High Table with Stretch Cover,Furniture,unit,32,0.1,85,0,10,40,
+SCN-WALL-SQM,Custom Scenic Wall / Set Build (MDF painted finish),Scenic & Fabrication,sqm,340,2.2,110,60,8,38,Per sqm of finished face; includes structural framing
+SCN-REG-DESK,Registration Desk - Curved Branded (3m),Scenic & Fabrication,unit,1250,4,110,180,1,38,Includes vinyl branding and internal shelf
+SCN-SHELL-3x3,Exhibition Shell Scheme Booth 3m x 3m,Scenic & Fabrication,unit,980,3.5,110,140,4,35,Includes fascia name board 2x spotlights 1x socket
+PRN-BACK-SQM,Backdrop Print on Fabric (incl. frame),Print & Branding,sqm,120,0.4,90,25,4,45,Dye-sub fabric; per sqm
+PRN-FLR-VNL,Floor Vinyl Print & Installation,Print & Branding,sqm,85,0.3,90,15,10,45,Anti-slip laminate included
+PWR-GEN-100,Generator 100 kVA (per event day incl. fuel & cabling),Power,day,0,4,130,2400,1,25,Includes distro board and 24hr standby technician
+PWR-DIST-STD,Power Distribution Package (indoor venue tie-in),Power,package,450,3,130,280,1,25,Where venue power is used instead of generator
+CRW-TECH-DAY,AV Technician (per day),Crew,day,0,10,150,0,1,20,Show-day operation; 10hr day then overtime
+CRW-STGH-DAY,Stagehand / General Crew (per day),Crew,day,0,10,80,0,2,20,Minimum call 2 crew
