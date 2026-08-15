@@ -253,9 +253,9 @@ class ItemDescriptionObservation(BaseModel):
     """
     Client language describing a requested item.
 
-  Multiple descriptions for the same logical item are preserved when different
-  emails phrase the request differently.
-  """
+    Multiple descriptions for the same logical item are preserved when different
+    emails phrase the request differently.
+    """
 
     observation_id: str
     source: SourceReference
