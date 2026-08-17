@@ -6,7 +6,7 @@ import csv
 from decimal import Decimal
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class Recipe(BaseModel):

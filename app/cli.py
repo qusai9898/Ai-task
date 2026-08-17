@@ -6,7 +6,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from app.extractor import BriefExtractor, DEFAULT_MODEL, ExtractionError
+from app.extractor import (
+    DEFAULT_OLLAMA_BASE_URL,
+    DEFAULT_PROVIDER,
+    BriefExtractor,
+    ExtractionError,
+)
 from app.pipeline import QuotingPipeline
 
 
@@ -32,7 +37,23 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("output/extraction.json"),
     )
-    extract_parser.add_argument("--model", default=DEFAULT_MODEL)
+    extract_parser.add_argument(
+        "--provider",
+        choices=["gemini", "ollama", "openai"],
+        default=DEFAULT_PROVIDER,
+        help="LLM provider (default: gemini)",
+    )
+    extract_parser.add_argument("--model", default=None, help="LLM model name")
+    extract_parser.add_argument(
+        "--base-url",
+        default=DEFAULT_OLLAMA_BASE_URL,
+        help="Ollama base URL (default: http://localhost:11434, used only for ollama)",
+    )
+    extract_parser.add_argument(
+        "--api-key",
+        default=None,
+        help="API key for Gemini or OpenAI (optional, overrides environment variables)",
+    )
     extract_parser.add_argument("--extraction-id", default=None)
     extract_parser.add_argument(
         "--catalog",
@@ -42,7 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     quote_parser = subparsers.add_parser(
         "quote",
-        help="Generate a structured quote from a client brief PDF (requires OPENAI_API_KEY)",
+        help="Generate a structured quote from a client brief PDF (uses Gemini by default)",
     )
     quote_parser.add_argument(
         "pdf_path",
@@ -62,7 +83,23 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("output/extraction.json"),
         help="Optional path to also save the intermediate extraction JSON",
     )
-    quote_parser.add_argument("--model", default=DEFAULT_MODEL)
+    quote_parser.add_argument(
+        "--provider",
+        choices=["gemini", "ollama", "openai"],
+        default=DEFAULT_PROVIDER,
+        help="LLM provider (default: gemini)",
+    )
+    quote_parser.add_argument("--model", default=None, help="LLM model name")
+    quote_parser.add_argument(
+        "--base-url",
+        default=DEFAULT_OLLAMA_BASE_URL,
+        help="Ollama base URL (default: http://localhost:11434, used only for ollama)",
+    )
+    quote_parser.add_argument(
+        "--api-key",
+        default=None,
+        help="API key for Gemini or OpenAI (optional, overrides environment variables)",
+    )
     quote_parser.add_argument("--extraction-id", default=None)
     quote_parser.add_argument("--quote-id", default=None)
     quote_parser.add_argument(
@@ -73,7 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     quote_from_json = subparsers.add_parser(
         "quote-from-json",
-        help="Generate a quote from an existing extraction JSON file (no OpenAI call)",
+        help="Generate a quote from an existing extraction JSON file (no LLM call)",
     )
     quote_from_json.add_argument(
         "extraction_path",
@@ -97,7 +134,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def cmd_extract(args: argparse.Namespace) -> int:
-    extractor = BriefExtractor(model=args.model, catalog_path=args.catalog)
+    extractor = BriefExtractor(
+        provider=args.provider,
+        model=args.model,
+        base_url=args.base_url,
+        api_key=args.api_key,
+        catalog_path=args.catalog,
+    )
     try:
         extraction = extractor.extract_from_pdf(
             pdf_path=args.pdf_path,
@@ -117,8 +160,14 @@ def cmd_extract(args: argparse.Namespace) -> int:
 
 
 def cmd_quote(args: argparse.Namespace) -> int:
-    pipeline = QuotingPipeline(catalog_path=args.catalog)
-    pipeline.extractor = BriefExtractor(model=args.model, catalog_path=args.catalog)
+    extractor = BriefExtractor(
+        provider=args.provider,
+        model=args.model,
+        base_url=args.base_url,
+        api_key=args.api_key,
+        catalog_path=args.catalog,
+    )
+    pipeline = QuotingPipeline(catalog_path=args.catalog, extractor=extractor)
 
     try:
         extraction, quote = pipeline.generate_quote_from_pdf(

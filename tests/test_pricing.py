@@ -37,7 +37,7 @@ def test_price_range_quantity_line():
     from app.models import ReviewReason
 
     qty = QuantityResult(
-        item_id="item-uplighters",
+        item_id="item_uplighters",
         recipe_code="LGT-UPL-BAT",
         catalog_unit="unit",
         min_quantity=Decimal("8"),
@@ -56,7 +56,7 @@ def test_custom_line_from_procurement_cost():
     catalog = RecipeCatalog.load(CATALOG_CSV)
     engine = PricingEngine(catalog)
     line = engine.price_custom_line(
-        item_id="item-hologram-box",
+        item_id="item_hologram_box",
         description="Hologram box",
         unit="unit",
         unit_cost_sar=Decimal("14000"),

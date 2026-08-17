@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from app.models import (
     BriefExtraction,
-    ObservationStatus,
     ResolutionStatus,
     ReviewFlag,
     ReviewReason,
@@ -127,19 +126,23 @@ class ReviewAggregator:
         matches: list[CatalogMatchResult],
     ) -> QuoteStatus:
         if any(f.severity == ReviewSeverity.CRITICAL for f in flags):
-            return QuoteStatus.BLOCKED
+            return QuoteStatus.REQUIRES_REVIEW
 
         unmatched_mandatory = [
             m
             for m in matches
-            if m.match_status == MatchStatus.NO_MATCH
+            if m.match_status in (MatchStatus.NO_MATCH, MatchStatus.UNMATCHED)
             and m.item_id not in self._cancelled_ids(matches)
         ]
         if unmatched_mandatory:
             return QuoteStatus.REQUIRES_REVIEW
 
         if any(
-            line.status in (QuoteLineStatus.REQUIRES_REVIEW, QuoteLineStatus.UNMATCHED)
+            line.status in (
+                QuoteLineStatus.REQUIRES_REVIEW,
+                QuoteLineStatus.UNMATCHED,
+                QuoteLineStatus.CUSTOM_ESTIMATE,
+            )
             for line in lines
         ):
             return QuoteStatus.REQUIRES_REVIEW

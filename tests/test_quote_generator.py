@@ -18,9 +18,9 @@ def _generator() -> QuoteGenerator:
 
 
 class TestQuoteGenerator:
-    def test_nexus_quote_blocked_by_critical_flag(self):
+    def test_nexus_quote_requires_review_by_critical_flag(self):
         quote = _generator().generate(build_nexus_brief_extraction())
-        assert quote.status == QuoteStatus.BLOCKED
+        assert quote.status == QuoteStatus.REQUIRES_REVIEW
         critical = [
             f for f in quote.review_flags
             if f.reason == ReviewReason.HIDDEN_INSTRUCTION_DETECTED
@@ -38,20 +38,20 @@ class TestQuoteGenerator:
         led_lines = [
             line
             for line in quote.lines
-            if line.item_id == "item-main-led-screen"
+            if line.item_id == "item_main_led_screen"
         ]
         assert led_lines
         assert led_lines[0].status == QuoteLineStatus.REQUIRES_REVIEW
 
     def test_uplighters_have_min_max_totals(self):
         quote = _generator().generate(build_nexus_brief_extraction())
-        upl = next(line for line in quote.lines if line.item_id == "item-uplighters")
+        upl = next(line for line in quote.lines if line.item_id == "item_uplighters")
         assert upl.min_line_total_sar is not None
         assert upl.max_line_total_sar is not None
 
     def test_hologram_custom_estimate_from_procurement(self):
         quote = _generator().generate(build_nexus_brief_extraction())
-        holo = next(line for line in quote.lines if line.item_id == "item-hologram-box")
+        holo = next(line for line in quote.lines if line.item_id == "item_hologram_box")
         assert holo.status == QuoteLineStatus.CUSTOM_ESTIMATE
         assert holo.line_cost_sar == Decimal("14000")
 

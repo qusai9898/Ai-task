@@ -129,7 +129,7 @@ class SourceReference(BaseModel):
 
     message_id: str
     sender: Optional[str] = None
-    sent_at: Optional[datetime] = None
+    sent_at: Optional[str] = None
     excerpt: str = Field(
         ...,
         min_length=1,
@@ -140,6 +140,15 @@ class SourceReference(BaseModel):
         description="Optional surrounding text for disambiguation; not a substitute for excerpt.",
     )
 
+    @field_validator("sent_at", mode="before")
+    @classmethod
+    def normalize_sent_at(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return str(v)
+
 
 class SourceMessage(BaseModel):
     """A single email or note in the client brief thread."""
@@ -148,7 +157,7 @@ class SourceMessage(BaseModel):
     thread_id: Optional[str] = None
     sender: str
     recipients: list[str] = Field(default_factory=list)
-    sent_at: Optional[datetime] = None
+    sent_at: Optional[str] = None
     subject: Optional[str] = None
     body: str
     message_kind: MessageKind = MessageKind.ORIGINAL
@@ -158,6 +167,15 @@ class SourceMessage(BaseModel):
         description="Chronological position in the thread; lower is earlier.",
     )
     parent_message_id: Optional[str] = None
+
+    @field_validator("sent_at", mode="before")
+    @classmethod
+    def normalize_sent_at(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return str(v)
 
 
 class QuantityValue(BaseModel):
@@ -371,6 +389,25 @@ class BriefExtraction(BaseModel):
     extraction_id: str
     source_document: str
     extracted_at: datetime
+    client_organization: Optional[str] = Field(
+        default=None,
+        description=(
+            "Name of the client organization/company requesting this event, if "
+            "identifiable from the brief text (e.g. sender's company, letterhead, "
+            "signature block). Null if not stated anywhere in the brief."
+        ),
+    )
+    event_name: Optional[str] = Field(
+        default=None,
+        description=(
+            "Name or title of the event itself, if stated in the brief "
+            "(e.g. 'Annual Excellence Awards Gala'). Null if not stated."
+        ),
+    )
+    venue: Optional[str] = Field(
+        default=None,
+        description="Venue name and/or location, if stated in the brief. Null if not stated.",
+    )
     messages: list[SourceMessage] = Field(default_factory=list)
     items: list[ExtractedItem] = Field(default_factory=list)
     cancellations: list[Cancellation] = Field(default_factory=list)

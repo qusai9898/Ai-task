@@ -127,7 +127,7 @@ class TestLedResolutionQuoteRecalculation:
             extraction,
             resolutions=ResolutionSet(resolutions=[resolution]),
         )
-        assert quote.status == QuoteStatus.BLOCKED
+        assert quote.status == QuoteStatus.REQUIRES_REVIEW
         assert any(
             f.reason == ReviewReason.HIDDEN_INSTRUCTION_DETECTED
             for f in quote.review_flags

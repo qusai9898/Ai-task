@@ -19,6 +19,7 @@ from app.models import ReviewFlag, ReviewReason
 
 class MatchStatus(str, Enum):
     MATCHED = "matched"
+    UNMATCHED = "unmatched"
     NO_MATCH = "no_match"
     AMBIGUOUS = "ambiguous"
     CANCELLED = "cancelled"
@@ -53,6 +54,7 @@ class QuantityResult(BaseModel):
     item_id: str
     recipe_code: str
     catalog_unit: str
+    requested_quantity: Optional[Decimal] = None
     calculated_quantity: Optional[Decimal] = None
     min_quantity: Optional[Decimal] = None
     max_quantity: Optional[Decimal] = None
@@ -89,6 +91,7 @@ class PricedLine(BaseModel):
     item_id: Optional[str] = None
     recipe_code: Optional[str] = None
     description: str
+    requested_quantity: Optional[Decimal] = None
     quantity: Optional[Decimal] = None
     min_quantity: Optional[Decimal] = None
     max_quantity: Optional[Decimal] = None

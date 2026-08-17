@@ -10,7 +10,6 @@ from app.models import (
     BriefExtraction,
     Cancellation,
     CatalogPresence,
-    CatalogSuggestion,
     ConfidenceLevel,
     Contradiction,
     ContradictionType,
@@ -19,14 +18,10 @@ from app.models import (
     DimensionValue,
     ExtractedItem,
     ItemDescriptionObservation,
-    MessageKind,
     ObservationStatus,
-    QuantityObservation,
     QuantityValue,
-    RequirementObservation,
     RequirementType,
     ResolutionStatus,
-    ReviewFlag,
     ReviewReason,
     ReviewSeverity,
     SourceMessage,
@@ -191,7 +186,7 @@ class TestBriefExtraction:
 
     def test_led_screen_contradiction_preserved(self):
         extraction = _build_nexus_brief_extraction()
-        led = next(i for i in extraction.items if i.item_id == "item-main-led-screen")
+        led = next(i for i in extraction.items if i.item_id == "item_main_led_screen")
         widths = [d for d in led.dimensions if d.dimension.kind == DimensionKind.WIDTH]
         assert len(widths) == 2
         assert extraction.contradictions[0].resolution_status == ResolutionStatus.UNRESOLVED
@@ -204,13 +199,13 @@ class TestBriefExtraction:
 
     def test_hologram_not_assumed_in_catalog(self):
         extraction = _build_nexus_brief_extraction()
-        hologram = next(i for i in extraction.items if i.item_id == "item-hologram-box")
+        hologram = next(i for i in extraction.items if i.item_id == "item_hologram_box")
         assert hologram.catalog_presence == CatalogPresence.LIKELY_NOT_IN_CATALOG
         assert hologram.suggested_catalog_codes == []
 
     def test_uplighter_ambiguous_quantity_is_range(self):
         extraction = _build_nexus_brief_extraction()
-        uplighters = next(i for i in extraction.items if i.item_id == "item-uplighters")
+        uplighters = next(i for i in extraction.items if i.item_id == "item_uplighters")
         qty = uplighters.quantities[0].quantity
         assert qty.is_range
         assert qty.value is None
@@ -275,3 +270,104 @@ class TestObservationStatus:
             notes="Preserved for audit; newer email requests wider screen.",
         )
         assert obs.status == ObservationStatus.SUPERSEDED
+
+
+class TestSourceTimestamps:
+    def test_source_reference_accepts_partial_timestamps(self):
+        ref_sunday = SourceReference(
+            message_id="msg-1",
+            sent_at="Sunday, 4:12 PM",
+            excerpt="6m by 3m",
+        )
+        assert ref_sunday.sent_at == "Sunday, 4:12 PM"
+
+        ref_tuesday = SourceReference(
+            message_id="msg-2",
+            sent_at="Tuesday, 09:47 AM",
+            excerpt="at least 8 meters wide",
+        )
+        assert ref_tuesday.sent_at == "Tuesday, 09:47 AM"
+
+    def test_source_message_accepts_partial_timestamps(self):
+        msg_sunday = SourceMessage(
+            message_id="msg-1",
+            sender="Fahad",
+            sent_at="Sunday, 4:12 PM",
+            body="First email",
+            sequence_order=0,
+        )
+        assert msg_sunday.sent_at == "Sunday, 4:12 PM"
+
+        msg_tuesday = SourceMessage(
+            message_id="msg-2",
+            sender="Khalid",
+            sent_at="Tuesday, 09:47 AM",
+            body="Second email",
+            sequence_order=1,
+        )
+        assert msg_tuesday.sent_at == "Tuesday, 09:47 AM"
+
+    def test_source_timestamps_preserved_losslessly_in_json_roundtrip(self):
+        raw_json = """{
+            "extraction_id": "extract-test-partial-ts",
+            "source_document": "brief.pdf",
+            "extracted_at": "2026-08-15T22:00:00Z",
+            "messages": [
+                {
+                    "message_id": "m-fahad",
+                    "sender": "Fahad",
+                    "sent_at": "Sunday, 4:12 PM",
+                    "body": "Need 6x3 screen",
+                    "sequence_order": 0
+                },
+                {
+                    "message_id": "m-khalid",
+                    "sender": "Khalid",
+                    "sent_at": "Tuesday, 09:47 AM",
+                    "body": "Make it 8m wide",
+                    "sequence_order": 1
+                }
+            ],
+            "items": [],
+            "cancellations": [],
+            "contradictions": [],
+            "review_flags": [],
+            "global_requirements": []
+        }"""
+        extraction = BriefExtraction.model_validate_json(raw_json)
+        assert extraction.messages[0].sent_at == "Sunday, 4:12 PM"
+        assert extraction.messages[1].sent_at == "Tuesday, 09:47 AM"
+
+        dumped = extraction.model_dump_json()
+        restored = BriefExtraction.model_validate_json(dumped)
+        assert restored.messages[0].sent_at == "Sunday, 4:12 PM"
+        assert restored.messages[1].sent_at == "Tuesday, 09:47 AM"
+
+    def test_source_reference_accepts_datetime_instance(self):
+        dt = datetime(2026, 8, 10, 16, 12)
+        ref = SourceReference(message_id="m1", excerpt="6m", sent_at=dt)
+        assert ref.sent_at == dt.isoformat()
+
+    def test_source_reference_strict_validation_unaffected(self):
+        with pytest.raises(ValidationError):
+            SourceReference(message_id="m1", excerpt="")
+
+        with pytest.raises(ValidationError):
+            SourceReference(excerpt="valid excerpt")  # missing message_id
+
+    def test_source_message_strict_validation_unaffected(self):
+        with pytest.raises(ValidationError):
+            SourceMessage(
+                message_id="m1",
+                sender="Fahad",
+                body="Body",
+                sequence_order=-1,  # ge=0 violation
+            )
+
+        with pytest.raises(ValidationError):
+            SourceMessage(
+                message_id="m1",
+                body="Body",
+                sequence_order=0,  # missing sender
+            )
+

@@ -53,7 +53,7 @@ def build_nexus_brief_extraction() -> BriefExtraction:
     fahad_sent = datetime(2026, 8, 10, 16, 12)
     khalid_sent = datetime(2026, 8, 12, 9, 47)
 
-    led_screen_item_id = "item-main-led-screen"
+    led_screen_item_id = "item_main_led_screen"
     led_width_fahad_obs = "obs-led-width-fahad"
     led_height_fahad_obs = "obs-led-height-fahad"
     led_width_khalid_obs = "obs-led-width-khalid"
@@ -158,7 +158,7 @@ def build_nexus_brief_extraction() -> BriefExtraction:
     )
 
     uplighters = ExtractedItem(
-        item_id="item-uplighters",
+        item_id="item_uplighters",
         label="Brand-color uplighters",
         location="main hall",
         quantities=[
@@ -188,7 +188,7 @@ def build_nexus_brief_extraction() -> BriefExtraction:
     )
 
     hologram = ExtractedItem(
-        item_id="item-hologram-box",
+        item_id="item_hologram_box",
         label="Hologram product display box",
         descriptions=[
             ItemDescriptionObservation(
@@ -335,7 +335,7 @@ def build_full_nexus_brief_extraction() -> BriefExtraction:
 
     extra_items = [
         ExtractedItem(
-            item_id="item-main-stage",
+            item_id="item_main_stage",
             label="Main hall stage",
             location="main hall",
             descriptions=[
@@ -802,8 +802,115 @@ def build_full_nexus_brief_extraction() -> BriefExtraction:
         "make the main screen bigger, at least 8 meters wide."
     )
 
+    # -----------------------------------------------------------------------
+    # Non-quoteable global requirements (project metadata / constraints).
+    # These must NEVER produce quote lines.
+    # -----------------------------------------------------------------------
+    non_quoteable_global_reqs = [
+        RequirementObservation(
+            observation_id="obs-venue-confirmation",
+            source=_source(
+                khalid_msg_id,
+                "Confirmed venue: King Abdullah Financial District conference centre, Riyadh. One day event with setup night before.",
+                sent_at=khalid_sent,
+            ),
+            confidence=ConfidenceLevel.HIGH,
+            requirement_type=RequirementType.OPERATIONAL,
+            description="Confirmed venue: King Abdullah Financial District conference centre, Riyadh. One day event with setup night before.",
+            is_mandatory=False,
+            applies_to_location="KAFD Riyadh",
+        ),
+        RequirementObservation(
+            observation_id="obs-finance-margin",
+            source=_source(
+                khalid_msg_id,
+                "Finance requires margins broken out per line item",
+                sent_at=khalid_sent,
+            ),
+            confidence=ConfidenceLevel.HIGH,
+            requirement_type=RequirementType.OTHER,
+            description="Finance requires margins broken out per line item",
+            is_mandatory=False,
+        ),
+        RequirementObservation(
+            observation_id="obs-quote-deadline",
+            source=_source(
+                khalid_msg_id,
+                "Quote required this week; event in 6 weeks",
+                sent_at=khalid_sent,
+            ),
+            confidence=ConfidenceLevel.HIGH,
+            requirement_type=RequirementType.TIMELINE,
+            description="Quote required this week; event in 6 weeks",
+            is_mandatory=False,
+        ),
+    ]
+
+    # -----------------------------------------------------------------------
+    # Microphone item: brief explicitly says "mics" for 5 speakers.
+    # No dedicated microphone catalog item exists (mics are bundled in
+    # AV-PA-MED but NOT in AV-PA-LRG which is what was quoted for main hall).
+    # This item must NOT be silently dropped — it must surface as
+    # UNMATCHED / REQUIRES_REVIEW so a human can confirm coverage.
+    # -----------------------------------------------------------------------
+    microphone_item = ExtractedItem(
+        item_id="item-breakout-mics",
+        label="Breakout microphones for 5 speakers",
+        location="breakout room",
+        descriptions=[
+            ItemDescriptionObservation(
+                observation_id="obs-mics-desc",
+                source=_source(
+                    khalid_msg_id,
+                    "for 5 speakers ... plus sound obviously so people can hear them ... and mics",
+                    sent_at=khalid_sent,
+                ),
+                confidence=ConfidenceLevel.HIGH,
+                client_text="microphones for 5 speakers",
+                human_review_required=True,
+                review_reason=ReviewReason.CATALOG_UNKNOWN,
+            ),
+        ],
+        quantities=[
+            QuantityObservation(
+                observation_id="obs-mics-qty",
+                source=_source(
+                    khalid_msg_id,
+                    "for 5 speakers",
+                    sent_at=khalid_sent,
+                ),
+                confidence=ConfidenceLevel.HIGH,
+                quantity=QuantityValue(
+                    raw_text="5 speakers",
+                    value=Decimal("5"),
+                    unit=UnitOfMeasure.UNIT,
+                ),
+            ),
+        ],
+        catalog_presence=CatalogPresence.LIKELY_NOT_IN_CATALOG,
+    )
+
+    # Add the 5-speaker count as a requirement on the breakout lounge item
+    # so it is preserved as a structured constraint
+    breakout_lounge = next(i for i in extra_items if i.item_id == "item-breakout-lounge")
+    breakout_lounge.requirements.append(
+        RequirementObservation(
+            observation_id="obs-breakout-speakers",
+            source=_source(
+                khalid_msg_id,
+                "nice lounge feel for 5 speakers",
+                sent_at=khalid_sent,
+            ),
+            confidence=ConfidenceLevel.HIGH,
+            requirement_type=RequirementType.OPERATIONAL,
+            description="5 speakers on panel; lounge setup required",
+            is_mandatory=True,
+        )
+    )
+
     return base.model_copy(
         update={
-            "items": base.items + extra_items,
+            "items": base.items + extra_items + [microphone_item],
+            "global_requirements": base.global_requirements + non_quoteable_global_reqs,
         }
     )

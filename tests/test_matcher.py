@@ -19,14 +19,14 @@ class TestCatalogMatcher:
     def test_led_screen_matches_suggestion(self):
         extraction = build_nexus_brief_extraction()
         matches = _matcher().match_extraction(extraction)
-        led = next(m for m in matches if m.item_id == "item-main-led-screen")
+        led = next(m for m in matches if m.item_id == "item_main_led_screen")
         assert led.match_status == MatchStatus.MATCHED
         assert led.recipe_code == "LED-P39-IN"
 
     def test_hologram_has_no_match(self):
         extraction = build_nexus_brief_extraction()
         matches = _matcher().match_extraction(extraction)
-        hologram = next(m for m in matches if m.item_id == "item-hologram-box")
+        hologram = next(m for m in matches if m.item_id == "item_hologram_box")
         assert hologram.match_status == MatchStatus.NO_MATCH
 
     def test_cancelled_breakout_stage_skipped(self):
@@ -44,7 +44,7 @@ class TestCatalogMatcher:
     def test_uplighters_match_battery_uplighter(self):
         extraction = build_nexus_brief_extraction()
         matches = _matcher().match_extraction(extraction)
-        uplighters = next(m for m in matches if m.item_id == "item-uplighters")
+        uplighters = next(m for m in matches if m.item_id == "item_uplighters")
         assert uplighters.match_status == MatchStatus.MATCHED
         assert uplighters.recipe_code == "LGT-UPL-BAT"
 

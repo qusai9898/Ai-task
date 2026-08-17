@@ -22,14 +22,14 @@ class TestQuantityCalculator:
     def test_led_screen_blocked_by_contradiction(self):
         extraction = build_nexus_brief_extraction()
         quantities = _quantities(extraction)
-        led = next(q for q in quantities if q.item_id == "item-main-led-screen")
+        led = next(q for q in quantities if q.item_id == "item_main_led_screen")
         assert led.requires_review
         assert led.calculated_quantity is None
 
     def test_uplighters_preserve_range(self):
         extraction = build_nexus_brief_extraction()
         quantities = _quantities(extraction)
-        upl = next(q for q in quantities if q.item_id == "item-uplighters")
+        upl = next(q for q in quantities if q.item_id == "item_uplighters")
         assert upl.min_quantity == Decimal("8")
         assert upl.max_quantity == Decimal("10")
         assert upl.requires_review
@@ -55,5 +55,10 @@ class TestQuantityCalculator:
     def test_chairs_from_guest_count(self):
         extraction = build_full_nexus_brief_extraction()
         quantities = _quantities(extraction)
-        chairs = next(q for q in quantities if q.item_id == "item-chairs")
+        # item-chairs can produce multiple quantity results (one per matched recipe).
+        # We want the one for banquet chairs (FRN-CHR-BQT).
+        chairs = next(
+            q for q in quantities
+            if q.item_id == "item-chairs" and q.recipe_code == "FRN-CHR-BQT"
+        )
         assert chairs.calculated_quantity == Decimal("450")
