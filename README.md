@@ -135,7 +135,7 @@ setx GEMINI_API_KEY "your-key-here"
 ## Running
 
 ```bash
-streamlit run app/web.py
+py -m streamlit run app/web.py --server.headless=true
 ```
 
 Or via the CLI, without the UI:

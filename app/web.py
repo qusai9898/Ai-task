@@ -213,6 +213,299 @@ def _display_review_flags(quote) -> None:
             st.caption(f"Items: {', '.join(flag.related_item_ids)}")
 
 
+def _collect_highlight_excerpts(extraction, quote=None) -> tuple[set, set, set]:
+    """Walk the ACTUAL extraction data -- never a hardcoded list -- to
+    find which verbatim brief excerpts were taken literally (green),
+    which were flagged for human judgment (yellow), and which came from
+    a detected adversarial instruction (red). Works for any brief.
+
+    Yellow is driven by TWO independent sources, because an item can end
+    up needing review for reasons the extraction layer itself never saw:
+      1. The extraction observation itself was flagged
+         (human_review_required=True) -- e.g. an ambiguous quantity or a
+         missing dimension the LLM noticed directly in the text.
+      2. The item's corresponding line in the FINAL QUOTE needs review
+         for a downstream reason the extraction layer has no visibility
+         into -- e.g. the item isn't in the catalog at all (matching
+         failure) or needs custom pricing confirmation. The hologram box
+         is a clear example: its own description text is perfectly
+         clear (not ambiguous), but it still needs a human to confirm
+         pricing because no catalog recipe exists for it.
+    """
+    green: set[str] = set()
+    yellow: set[str] = set()
+    red: set[str] = set()
+
+    for flag in extraction.review_flags:
+        if flag.reason == ReviewReason.HIDDEN_INSTRUCTION_DETECTED and flag.source and flag.source.excerpt:
+            red.add(flag.source.excerpt)
+
+    def _bucket(obs_list):
+        for obs in obs_list:
+            excerpt = obs.source.excerpt if getattr(obs, "source", None) else None
+            if not excerpt:
+                continue
+            if getattr(obs, "human_review_required", False):
+                yellow.add(excerpt)
+            else:
+                green.add(excerpt)
+
+    for item in extraction.items:
+        _bucket(item.descriptions)
+        _bucket(item.quantities)
+        _bucket(item.dimensions)
+        _bucket(item.requirements)
+
+    _bucket(extraction.global_requirements)
+
+    # Source 2: items whose FINAL quote line still needs review for a
+    # downstream reason (catalog match failure, custom pricing, etc.)
+    # get every one of their excerpts marked yellow too, even if the
+    # extraction layer never flagged the text itself as ambiguous.
+    if quote is not None:
+        needs_review_item_ids = {
+            line.item_id for line in quote.lines
+            if line.item_id and line.status in (
+                QuoteLineStatus.REQUIRES_REVIEW,
+                QuoteLineStatus.UNMATCHED,
+                QuoteLineStatus.CUSTOM_ESTIMATE,
+            )
+        }
+        for item in extraction.items:
+            if item.item_id not in needs_review_item_ids:
+                continue
+            for obs_list in (item.descriptions, item.quantities, item.dimensions, item.requirements):
+                for obs in obs_list:
+                    excerpt = obs.source.excerpt if getattr(obs, "source", None) else None
+                    if excerpt:
+                        yellow.add(excerpt)
+
+    # Priority: red > yellow > green when the same excerpt was captured
+    # more than once with different outcomes.
+    yellow -= red
+    green -= red
+    green -= yellow
+
+    return green, yellow, red
+
+
+def _highlight_message_body(body: str, green: set, yellow: set, red: set) -> str:
+    import html as _html
+
+    n = len(body)
+    colors: list[str | None] = [None] * n
+
+    def _mark(excerpts: set, color: str) -> None:
+        for excerpt in excerpts:
+            if not excerpt:
+                continue
+            start = 0
+            while True:
+                idx = body.find(excerpt, start)
+                if idx == -1:
+                    break
+                for i in range(idx, min(idx + len(excerpt), n)):
+                    colors[i] = color
+                start = idx + 1
+
+    _mark(green, "green")
+    _mark(yellow, "yellow")
+    _mark(red, "red")
+
+    bg = {"green": "#bbf7d0", "yellow": "#fef08a", "red": "#fecaca"}
+
+    out: list[str] = []
+    i = 0
+    while i < n:
+        color = colors[i]
+        j = i
+        while j < n and colors[j] == color:
+            j += 1
+        chunk = _html.escape(body[i:j]).replace("\n", "<br/>")
+        if color:
+            out.append(f'<span style="background:{bg[color]};">{chunk}</span>')
+        else:
+            out.append(chunk)
+        i = j
+
+    return "".join(out)
+
+
+def _build_highlighted_brief_html(extraction, quote, client_name: str, event_name: str) -> str:
+    green, yellow, red = _collect_highlight_excerpts(extraction, quote)
+
+    messages_html = ""
+    for msg in extraction.messages:
+        highlighted = _highlight_message_body(msg.body, green, yellow, red)
+        messages_html += f"""
+        <div class="msg-block">
+            <div class="msg-meta">
+                <span class="msg-subject">{msg.subject or msg.message_id}</span>
+                <span class="msg-sender">{msg.sender}</span>
+            </div>
+            <div class="msg-body">{highlighted}</div>
+        </div>
+        """
+
+    header_logo_uri = _logo_data_uri_web()
+    header_logo_html = (
+        f'<img class="header-logo" src="{header_logo_uri}" alt="Munginvest" />'
+        if header_logo_uri else ""
+    )
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Annotated Brief — {client_name or "Client"}</title>
+<style>
+    body {{
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #f1f5f9;
+        margin: 0;
+        padding: 32px;
+        color: #0f172a;
+    }}
+    .doc-card {{
+        max-width: 820px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08);
+        padding: 40px;
+    }}
+    .header-logo {{
+        height: 40px;
+        width: auto;
+        margin-bottom: 10px;
+    }}
+    .doc-title {{
+        font-size: 22px;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 4px;
+    }}
+    .doc-subtitle {{
+        font-size: 13px;
+        color: #64748b;
+        margin-bottom: 20px;
+    }}
+    .doc-meta {{
+        font-size: 12px;
+        color: #64748b;
+        margin-bottom: 24px;
+    }}
+    .legend {{
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        padding: 14px 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-bottom: 28px;
+        font-size: 12px;
+    }}
+    .legend span.swatch {{
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 600;
+        margin-right: 4px;
+    }}
+    .msg-block {{
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }}
+    .msg-meta {{
+        background: #f1f5f9;
+        padding: 10px 16px;
+        border-bottom: 1px solid #e2e8f0;
+        border-radius: 8px 8px 0 0;
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }}
+    .msg-subject {{ font-weight: 700; color: #0f172a; }}
+    .msg-sender {{ color: #64748b; }}
+    .msg-body {{
+        padding: 16px 18px;
+        font-size: 13px;
+        line-height: 1.8;
+        color: #1e293b;
+    }}
+    .msg-body span {{
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }}
+    @media print {{
+        body {{ background: white; padding: 0; }}
+        .doc-card {{ box-shadow: none; border-radius: 0; max-width: 100%; }}
+        html, body {{
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }}
+    }}
+</style>
+</head>
+<body>
+    <div class="doc-card">
+        {header_logo_html}
+        <div class="doc-title">Annotated Brief</div>
+        <div class="doc-subtitle">
+            Color-coded automatically from the extraction's own data — not a manual summary.
+        </div>
+        <div class="doc-meta">
+            <strong>Client:</strong> {client_name or "—"} &nbsp;&nbsp; <strong>Event:</strong> {event_name or "—"}
+        </div>
+        <div class="legend">
+            <div><span class="swatch" style="background:#bbf7d0;">Taken literally</span>used directly, no review needed</div>
+            <div><span class="swatch" style="background:#fef08a;">Human judgment</span>flagged for review</div>
+            <div><span class="swatch" style="background:#fecaca;">Adversarial</span>detected &amp; excluded from pricing</div>
+        </div>
+        {messages_html}
+    </div>
+</body>
+</html>
+"""
+
+
+def _logo_data_uri_web() -> str | None:
+    b64 = _image_to_base64(LOGO_HEADER_PATH)
+    return f"data:image/png;base64,{b64}" if b64 else None
+
+
+def _display_brief_highlights_tab(extraction, quote) -> None:
+    st.subheader("Annotated Brief")
+    st.caption(
+        "The original brief text, color-coded automatically from the extraction's own data — "
+        "not a manual summary. Every highlight is traceable to a real field in the extraction "
+        "or the final quote."
+    )
+
+    if not extraction.messages:
+        st.info("No message text available in this extraction to highlight.")
+        return
+
+    client_name = st.session_state.get("client_name", "")
+    event_name = st.session_state.get("event_name", "")
+    html_content = _build_highlighted_brief_html(extraction, quote, client_name, event_name)
+
+    st.download_button(
+        label="📄 Download Annotated Brief (HTML — open and use Ctrl+P → Save as PDF)",
+        data=html_content,
+        file_name="Annotated_Brief.html",
+        mime="text/html",
+        use_container_width=True,
+    )
+
+    components.html(html_content, height=880, scrolling=True)
+
+
 def _set_proposal_defaults_from_extraction(extraction) -> None:
     """Pre-fill client/event/venue from what the LLM actually found in the
     brief text (client_organization/event_name/venue on the extraction).
@@ -1028,7 +1321,11 @@ def main() -> None:
     quote = st.session_state.quote
 
     # Render Tabs
-    tab1, tab2 = st.tabs(["⚙️ Internal Pricing & Review", "📄 Official Client Proposal"])
+    tab1, tab2, tab3 = st.tabs([
+        "⚙️ Internal Pricing & Review",
+        "📄 Official Client Proposal",
+        "🔍 Brief Highlights",
+    ])
 
     with tab1:
         _display_totals(st.session_state.quote)
@@ -1048,6 +1345,9 @@ def main() -> None:
 
     with tab2:
         _display_client_proposal_tab(st.session_state.quote)
+
+    with tab3:
+        _display_brief_highlights_tab(st.session_state.extraction, st.session_state.quote)
 
 
 if __name__ == "__main__":
