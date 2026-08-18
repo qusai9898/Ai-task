@@ -156,7 +156,7 @@ export GEMINI_API_KEY="your-key-here"  # macOS/Linux
 Run the app:
 
 ```bash
-streamlit run app/web.py
+py -m streamlit run app/web.py --server.headless=true
 ```
 
 Run the tests:
