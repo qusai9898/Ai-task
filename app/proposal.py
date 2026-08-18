@@ -288,6 +288,7 @@ class ProposalGenerator:
                     <span class="category-title">{group.category_name}</span>
                     <span class="category-subtotal">SAR {group.subtotal_sar:,.2f}</span>
                 </div>
+                <div class="table-scroll">
                 <table class="proposal-table">
                     <thead>
                         <tr>
@@ -302,12 +303,13 @@ class ProposalGenerator:
                         {rows_html}
                     </tbody>
                 </table>
+                </div>
             </div>
             """
 
         inclusions_html = "".join([f"<li>{inc}</li>" for inc in proposal.notes_and_inclusions])
 
-        header_logo_uri = _logo_data_uri("logo_pro.png")
+        header_logo_uri = _logo_data_uri("logo_header.png")
         header_logo_html = (
             f'<img class="header-logo" src="{header_logo_uri}" alt="Munginvest" />'
             if header_logo_uri else ""
@@ -333,6 +335,7 @@ class ProposalGenerator:
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Commercial Proposal — {proposal.event_name}</title>
     <style>
         * {{
@@ -357,11 +360,22 @@ class ProposalGenerator:
         }}
         .header-container {{
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: flex-start;
+            gap: 16px;
             border-bottom: 2px solid #6366f1;
             padding-bottom: 24px;
             margin-bottom: 32px;
+        }}
+        .header-container > div:first-child {{
+            flex: 3 1 240px;
+            min-width: 0;
+        }}
+        .proposal-meta {{
+            flex: 1 1 160px;
+            min-width: 0;
+            text-align: right;
         }}
         .brand-title {{
             font-size: 24px;
@@ -374,9 +388,6 @@ class ProposalGenerator:
             color: #64748b;
             margin-top: 4px;
             font-weight: 500;
-        }}
-        .proposal-meta {{
-            text-align: right;
         }}
         .prop-number {{
             font-size: 16px;
@@ -412,7 +423,7 @@ class ProposalGenerator:
         }}
         .info-grid {{
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 20px;
             background: #f8fafc;
             padding: 20px;
@@ -547,7 +558,7 @@ class ProposalGenerator:
             padding-top: 28px;
             margin-top: 28px;
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 28px;
             font-size: 12px;
             color: #64748b;
@@ -566,13 +577,16 @@ class ProposalGenerator:
         }}
         .signature-section {{
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
+            gap: 24px;
             margin-top: 48px;
             padding-top: 28px;
             border-top: 1px solid #e2e8f0;
         }}
         .sig-box {{
-            width: 220px;
+            flex: 1 1 220px;
+            min-width: 0;
         }}
         .sig-line {{
             border-bottom: 1px solid #94a3b8;
@@ -632,6 +646,64 @@ class ProposalGenerator:
         }}
         .proposal-card {{
             position: relative;
+        }}
+        .table-scroll {{
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }}
+        @media (max-width: 640px) {{
+            body {{
+                padding: 16px 8px;
+            }}
+            .proposal-card {{
+                padding: 20px 16px;
+                border-radius: 8px;
+            }}
+            .header-container {{
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 14px;
+            }}
+            .proposal-meta {{
+                text-align: left;
+            }}
+            .brand-title {{
+                font-size: 19px;
+            }}
+            .info-grid {{
+                grid-template-columns: 1fr;
+                padding: 14px;
+            }}
+            .proposal-table {{
+                font-size: 12px;
+                min-width: 560px;
+            }}
+            .proposal-table th, .proposal-table td {{
+                padding: 8px 6px;
+            }}
+            .summary-container {{
+                justify-content: stretch;
+            }}
+            .summary-box {{
+                width: 100%;
+            }}
+            .terms-section {{
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }}
+            .signature-section {{
+                flex-direction: column;
+                gap: 28px;
+            }}
+            .sig-box {{
+                width: 100%;
+            }}
+            .page-watermark {{
+                width: 24px;
+                top: 14px;
+                right: 14px;
+            }}
         }}
     </style>
 </head>

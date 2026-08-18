@@ -1,4 +1,4 @@
-"""Streamlit Web UI for AI Quoting Tool — human review, pricing engine & official proposal generator."""
+"""Streamlit Web UI for AI Quotation — human review, pricing engine & official proposal generator."""
 
 from __future__ import annotations
 
@@ -234,6 +234,7 @@ def _collect_highlight_excerpts(extraction, quote=None) -> tuple[set, set, set]:
     """
     green: set[str] = set()
     yellow: set[str] = set()
+    purple: set[str] = set()
     red: set[str] = set()
 
     for flag in extraction.review_flags:
@@ -255,8 +256,6 @@ def _collect_highlight_excerpts(extraction, quote=None) -> tuple[set, set, set]:
         _bucket(item.quantities)
         _bucket(item.dimensions)
         _bucket(item.requirements)
-
-    _bucket(extraction.global_requirements)
 
     # Source 2: items whose FINAL quote line still needs review for a
     # downstream reason (catalog match failure, custom pricing, etc.)
@@ -280,16 +279,51 @@ def _collect_highlight_excerpts(extraction, quote=None) -> tuple[set, set, set]:
                     if excerpt:
                         yellow.add(excerpt)
 
-    # Priority: red > yellow > green when the same excerpt was captured
-    # more than once with different outcomes.
+        # global_requirements get their OWN color (purple), separate from
+        # per-item yellow -- they apply broadly (power, budget, timeline,
+        # procurement pricing basis), not to one specific item. We only
+        # highlight a procurement_reference excerpt when its stated
+        # number is a CONFIRMED, exact match to a real CUSTOM_ESTIMATE
+        # line's cost basis (e.g. the hologram box's material_cost_sar
+        # actually equals the "SAR 14,000" the client quoted) -- a
+        # precise traceable link, not a guess that any custom line
+        # existing somewhere means this text was the one used.
+        import re
+
+        custom_cost_values = {
+            str(int(line.material_cost_sar))
+            for line in quote.lines
+            if line.status == QuoteLineStatus.CUSTOM_ESTIMATE and line.material_cost_sar is not None
+        }
+        for req in extraction.global_requirements:
+            excerpt = req.source.excerpt if getattr(req, "source", None) else None
+            if not excerpt:
+                continue
+            if getattr(req, "requirement_type", None) == "procurement_reference" and custom_cost_values:
+                numbers = {n.replace(",", "") for n in re.findall(r"[\d,]{3,}", excerpt)}
+                if numbers & custom_cost_values:
+                    purple.add(excerpt)
+                    continue
+            # Any other global requirement (power, operational, budget,
+            # timeline...) that the extraction itself flagged for review
+            # still gets the ordinary yellow treatment; otherwise it's
+            # left unhighlighted rather than guessed at.
+            if getattr(req, "human_review_required", False):
+                yellow.add(excerpt)
+
+    # Priority: red > purple > yellow > green when the same excerpt was
+    # captured more than once with different outcomes.
+    purple -= red
     yellow -= red
+    yellow -= purple
     green -= red
     green -= yellow
+    green -= purple
 
-    return green, yellow, red
+    return green, yellow, purple, red
 
 
-def _highlight_message_body(body: str, green: set, yellow: set, red: set) -> str:
+def _highlight_message_body(body: str, green: set, yellow: set, purple: set, red: set) -> str:
     import html as _html
 
     n = len(body)
@@ -310,9 +344,10 @@ def _highlight_message_body(body: str, green: set, yellow: set, red: set) -> str
 
     _mark(green, "green")
     _mark(yellow, "yellow")
+    _mark(purple, "purple")
     _mark(red, "red")
 
-    bg = {"green": "#bbf7d0", "yellow": "#fef08a", "red": "#fecaca"}
+    bg = {"green": "#bbf7d0", "yellow": "#fef08a", "purple": "#ddd6fe", "red": "#fecaca"}
 
     out: list[str] = []
     i = 0
@@ -332,19 +367,31 @@ def _highlight_message_body(body: str, green: set, yellow: set, red: set) -> str
 
 
 def _build_highlighted_brief_html(extraction, quote, client_name: str, event_name: str) -> str:
-    green, yellow, red = _collect_highlight_excerpts(extraction, quote)
+    green, yellow, purple, red = _collect_highlight_excerpts(extraction, quote)
 
     messages_html = ""
-    for msg in extraction.messages:
-        highlighted = _highlight_message_body(msg.body, green, yellow, red)
+    for idx, msg in enumerate(extraction.messages):
+        highlighted = _highlight_message_body(msg.body, green, yellow, purple, red)
+
+        separator = '<hr class="msg-separator" />' if idx > 0 else ""
+        forwarded_marker = (
+            '<div class="forwarded-marker">---------- Forwarded message ----------</div>'
+            if idx > 0 and getattr(msg, "message_kind", None) == "forward"
+            else ""
+        )
+        recipients_line = (
+            f'<div class="email-meta-line"><b>To:</b> {", ".join(msg.recipients)}</div>'
+            if getattr(msg, "recipients", None) else ""
+        )
+
         messages_html += f"""
-        <div class="msg-block">
-            <div class="msg-meta">
-                <span class="msg-subject">{msg.subject or msg.message_id}</span>
-                <span class="msg-sender">{msg.sender}</span>
-            </div>
-            <div class="msg-body">{highlighted}</div>
-        </div>
+        {separator}
+        {forwarded_marker}
+        <div class="email-meta-line"><b>From:</b> {msg.sender}</div>
+        <div class="email-meta-line"><b>Sent:</b> {msg.sent_at or "—"}</div>
+        {recipients_line}
+        <div class="email-meta-line"><b>Subject:</b> {msg.subject or msg.message_id}</div>
+        <div class="email-body">{highlighted}</div>
         """
 
     header_logo_uri = _logo_data_uri_web()
@@ -412,33 +459,29 @@ def _build_highlighted_brief_html(extraction, quote, client_name: str, event_nam
         font-weight: 600;
         margin-right: 4px;
     }}
-    .msg-block {{
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        break-inside: avoid;
-        page-break-inside: avoid;
+    .msg-separator {{
+        border: none;
+        border-top: 1px solid #e2e8f0;
+        margin: 22px 0;
     }}
-    .msg-meta {{
-        background: #f1f5f9;
-        padding: 10px 16px;
-        border-bottom: 1px solid #e2e8f0;
-        border-radius: 8px 8px 0 0;
-        font-size: 12px;
-        display: flex;
-        justify-content: space-between;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
+    .forwarded-marker {{
+        font-weight: 700;
+        font-size: 12.5px;
+        color: #0f172a;
+        margin-bottom: 6px;
     }}
-    .msg-subject {{ font-weight: 700; color: #0f172a; }}
-    .msg-sender {{ color: #64748b; }}
-    .msg-body {{
-        padding: 16px 18px;
-        font-size: 13px;
-        line-height: 1.8;
+    .email-meta-line {{
+        font-size: 12.5px;
+        color: #1e293b;
+        margin-bottom: 2px;
+    }}
+    .email-body {{
+        margin-top: 12px;
+        font-size: 13.5px;
+        line-height: 1.85;
         color: #1e293b;
     }}
-    .msg-body span {{
+    .email-body span {{
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }}
@@ -465,6 +508,7 @@ def _build_highlighted_brief_html(extraction, quote, client_name: str, event_nam
         <div class="legend">
             <div><span class="swatch" style="background:#bbf7d0;">Taken literally</span>used directly, no review needed</div>
             <div><span class="swatch" style="background:#fef08a;">Human judgment</span>flagged for review</div>
+            <div><span class="swatch" style="background:#ddd6fe;">Global requirement</span>applies broadly, confirmed used in pricing</div>
             <div><span class="swatch" style="background:#fecaca;">Adversarial</span>detected &amp; excluded from pricing</div>
         </div>
         {messages_html}
@@ -1200,7 +1244,7 @@ def _display_client_proposal_tab(quote) -> None:
 
 def main() -> None:
     st.set_page_config(
-        page_title="AI Quoting Tool — Studio Production",
+        page_title="AI Quotation — Studio Production",
         page_icon=str(LOGO_WATERMARK_PATH) if LOGO_WATERMARK_PATH.is_file() else "📋",
         layout="wide",
     )
@@ -1212,7 +1256,7 @@ def main() -> None:
         if LOGO_HEADER_PATH.is_file():
             st.image(str(LOGO_HEADER_PATH), width=140)
     with header_col2:
-        st.markdown('<div class="main-header">AI Quoting Tool & Proposal Studio</div>', unsafe_allow_html=True)
+        st.markdown('<div class="main-header">AI Quotation & Proposal Studio</div>', unsafe_allow_html=True)
         st.caption(
             "AI-assisted client brief extraction, deterministic quoting, interactive human review, and official proposal generation."
         )
@@ -1250,6 +1294,32 @@ def main() -> None:
 
         if input_mode == "Upload PDF":
             uploaded = st.file_uploader("Client brief PDF", type=["pdf"])
+
+            if uploaded is not None:
+                with st.expander("🔎 Show extracted PDF text (diagnostic)"):
+                    st.caption(
+                        "This is the EXACT text the app extracts from your PDF before sending it "
+                        "to Gemini. PDF copy-paste often differs subtly from this (line wrapping, "
+                        "spacing, smart quotes) even when it looks identical on screen -- if you "
+                        "want a true apples-to-apples comparison with Paste Text mode, copy the "
+                        "text from HERE, not from your PDF viewer."
+                    )
+                    try:
+                        from app.pdf_reader import extract_text_from_pdf as _peek_pdf_text
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_peek:
+                            tmp_peek.write(uploaded.getvalue())
+                            tmp_peek_path = Path(tmp_peek.name)
+                        try:
+                            extracted_preview = _peek_pdf_text(tmp_peek_path)
+                        finally:
+                            tmp_peek_path.unlink(missing_ok=True)
+                        st.text_area(
+                            "Extracted text", value=extracted_preview, height=200,
+                            key="pdf_extracted_preview",
+                        )
+                    except Exception as exc:
+                        st.warning(f"Could not preview extracted text: {exc}")
+
             if st.button("Generate quote from uploaded PDF", use_container_width=True):
                 if uploaded is None:
                     st.warning("Upload a PDF first.")
@@ -1272,6 +1342,14 @@ def main() -> None:
                             tmp_path.unlink(missing_ok=True)
 
         elif input_mode == "Paste Text":
+            st.caption(
+                "⚠️ For a fair comparison against a PDF upload of the SAME brief, use the "
+                "'Show extracted PDF text' diagnostic under Upload PDF and paste THAT text here "
+                "-- not text copied directly from a PDF viewer, which can differ subtly even when "
+                "it looks identical (line wraps, spacing, smart quotes). Any remaining difference "
+                "after that is genuine LLM run-to-run variance, not an app bug -- both paths call "
+                "the exact same extraction function with temperature=0.0 and a fixed seed."
+            )
             pasted_text = st.text_area(
                 "Paste Client Brief (emails / notes / requirements)",
                 height=180,

@@ -1,36 +1,57 @@
-# AI Quoting Tool & Proposal Studio
+<div align="center">
 
-AI-assisted client brief extraction, **deterministic** quoting, interactive human review, and official client-ready proposal generation for an events production company.
+# AI Quotation & Proposal Studio
 
-Built for **Munginvest**.
+**From a messy client brief to a priced, client-ready proposal — in minutes, not hours.**
 
----
+![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)
+![Gemini](https://img.shields.io/badge/Google_Gemini-Extraction-4285F4?logo=google&logoColor=white)
+![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063?logo=pydantic&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-143%2B%20passing-brightgreen)
+![License](https://img.shields.io/badge/status-active-success)
 
-## What this tool does
-
-A client sends a brief — usually a messy real-world email thread, RFP document, or meeting notes, full of ambiguity, contradictions, and informal language. This tool:
-
-1. **Reads the brief** (PDF or pasted text) using an LLM (Gemini) to pull out structured observations — items, dimensions, quantities, requirements, cancellations, contradictions.
-2. **Matches** each observation to a recipe/catalog code using **deterministic keyword rules** — never guessed by the LLM.
-3. **Calculates quantities and prices** deterministically from the catalog (cost, margin, minimum order quantities).
-4. **Flags anything genuinely ambiguous** for a human to resolve (missing dimensions, quantity ranges, custom pricing, items not in the catalog) — through a **dynamic** review UI that adapts to whatever the brief actually contains, not a fixed set of items.
-5. **Generates a branded, client-ready commercial proposal** (HTML, printable to PDF) with margins broken out per line, only claiming inclusions that are actually priced in the quote.
-
-### Core design principle: the LLM only *reads*, it never *decides*
-
-This is the single most important architectural rule in the whole project:
-
-> The LLM's job is limited to interpreting the brief into structured data. It never calculates prices, never resolves contradictions, never picks a catalog match with confidence, and never invents a missing number. All of that is deterministic Python code, or an explicit human decision.
-
-This makes the tool **auditable** — the same resolved inputs always produce the same quote, and every number in a proposal can be traced back to either the client's own words or a human's explicit choice.
+</div>
 
 ---
 
-## Pipeline overview
+## What This Is
+
+A client sends a brief — usually a messy, real-world email thread, RFP document, or meeting notes: contradictions, vague quantities, informal language. This tool:
+
+1. **Reads** the brief (PDF) with an LLM and pulls out structured data — items, dimensions, quantities, requirements, cancellations, contradictions.
+2. **Matches** every item to a product/recipe using deterministic keyword rules — never guessed by the AI.
+3. **Calculates & prices** everything deterministically from the catalog (cost, margin, minimum order quantities).
+4. **Flags anything genuinely ambiguous** for a human, through a review UI that adapts automatically to whatever the brief contains.
+5. **Generates a branded, client-ready commercial proposal**, ready to send.
+
+### The one rule everything else is built around
+
+> **The AI only reads. It never decides.**
+> Extraction is the LLM's entire job. Every price, every match, every calculation is deterministic code — auditable, repeatable, and never hallucinated.
+
+---
+
+## 🤖 AI Tools Used to Build This
+
+This project was built AI-natively — every stage of the workflow, from first scaffold to final polish, used an AI tool deliberately chosen for that stage:
+
+| Tool | Role in this project |
+|---|---|
+| **[Antigravity](https://antigravity.google/)** | Early-stage scaffolding — initial architecture pass and the fan-out catalog-matching redesign, before the main build-out phase |
+| **[Claude](https://claude.ai) (Anthropic)** | The primary build partner for the majority of this project — iterative debugging, root-cause diagnosis across multiple test briefs, the full dynamic human-review system, responsive/print CSS, branding integration, and this README |
+| **[Google Gemini](https://ai.google.dev/)** | Not just a dev tool — this is the LLM running *inside* the shipped product, doing structured brief extraction at runtime |
+| **[Whisk](https://labs.google/whisk)** | Generated the Munginvest logo assets |
+
+Two different working modes on purpose: Gemini is a **runtime dependency** the app calls on every quote; Antigravity and Claude were **build-time collaborators** used during development and are not part of the running app.
+
+---
+
+## Pipeline
 
 ```mermaid
 flowchart TD
-    A["Client Brief<br/>(PDF / pasted text)"] --> B["Extraction<br/>(Gemini + Pydantic schema)"]
+    A["Client Brief<br/>(PDF)"] --> B["Extraction<br/>(Gemini + Pydantic schema)"]
     B --> C{"Structured BriefExtraction<br/>items, dimensions, quantities,<br/>requirements, cancellations,<br/>contradictions, review_flags"}
     C --> D["Catalog Matching<br/>(deterministic keyword rules)"]
     D --> E{"Match result"}
@@ -42,7 +63,7 @@ flowchart TD
     I --> J["Dynamic Human Review Panels<br/>(auto-generated per flagged line)"]
     J -->|"reviewer resolves<br/>dimension / quantity / price"| K["Quote Recalculated<br/>(deterministic, no LLM call)"]
     K --> I
-    I --> L["Official Client Proposal<br/>(branded HTML, print-to-PDF)"]
+    I --> L["Branded Client Proposal<br/>(print-ready HTML)"]
 
     style B fill:#4f46e5,color:#fff
     style D fill:#0891b2,color:#fff
@@ -51,66 +72,66 @@ flowchart TD
     style L fill:#16a34a,color:#fff
 ```
 
-**Key point on the loop back from J → K → I:** resolving a flagged item never calls the LLM again. It's a pure deterministic recalculation, which is what makes the review step safe, fast, and repeatable.
+**The loop from J → K → I never calls the LLM again.** Resolving a flagged item is a pure deterministic recalculation — that's what makes human review fast, safe, and repeatable.
 
 ---
 
-## Key features
+## ✨ Key Features
 
-### Extraction (`app/extractor.py`, `app/models.py`)
-- Supports Gemini (default), OpenAI, and Ollama as interchangeable LLM providers.
-- `temperature=0.0` pinned for maximum determinism (LLMs are not perfectly deterministic even at temp=0, but this minimizes drift).
-- Structured output via a Pydantic schema (`BriefExtraction`) — no free-text parsing.
-- Preserves **contradictions** explicitly (e.g. brief says 6m, then later says "at least 8m") rather than silently picking one.
-- Preserves **cancellations** and links them to the original item.
-- Detects **adversarial prompt injection** embedded in brief documents (e.g. a hidden instruction trying to force an unauthorized line item into the quote) and flags it as a critical security review item — it is always excluded from pricing.
-- Auto-extracts `client_organization`, `event_name`, and `venue` from the brief text to pre-fill the proposal (never guessed if not stated).
+### 🧠 Extraction
+- Google Gemini, structured JSON output validated against a Pydantic schema — no free-text parsing
+- `temperature=0.0` + fixed seed for maximum determinism
+- Preserves **contradictions** explicitly instead of silently picking one
+- Detects **adversarial prompt-injection** hidden inside brief documents and blocks it from ever reaching pricing
+- Auto-extracts client name, event name, and venue to pre-fill the proposal — never guessed
 
-### Catalog matching (`app/matcher.py`)
-- Deterministic keyword-rule engine — no LLM involvement.
-- **Fan-out matching**: a single brief sentence describing multiple physical products (e.g. "a stage... with steps and it must have the ramp for accessibility") correctly produces *multiple* independent catalog lines instead of forcing a single choice.
-- Distinguishes genuinely independent components (ramp + stage + stairs) from a single ambiguous item matched by two unrelated rules (e.g. "LED backdrop wall" incorrectly also matching a generic print-backdrop rule) — the latter is scoped with exclusion keywords to prevent false duplicates.
-- Global (non-item-specific) requirements — like "whatever crew you need" or "backup power, non-negotiable" — are matched against the catalog too, so a mandatory requirement never silently disappears just because it wasn't phrased as a per-item request.
+### 🔗 Catalog Matching
+- 100% deterministic keyword-rule engine, no LLM involvement
+- **Fan-out matching**: one sentence describing multiple products (e.g. "a stage with steps and a ramp") correctly produces multiple independent line items
+- Global (non-item-specific) requirements — "whatever crew you need," "backup power, non-negotiable" — are matched too, so mandatory requirements never silently vanish
 
-### Quantity & pricing (`app/quantities.py`, `app/pricing.py`)
-- Deterministic. Parses stated ratios from the brief text itself (e.g. "8 guests per table") rather than assuming a fixed default.
-- Applies catalog minimum-order-quantities correctly.
-- Multi-day billing (setup day + event day) is derived from whether the brief actually mentions an overnight setup — never hardcoded.
-- A human resolution can target **one specific catalog product** within a bundled/fan-out item (via `recipe_code` scoping) so resolving one component (e.g. confirming sofa quantity) can never accidentally overwrite a sibling component (e.g. a projector count) from the same brief sentence.
+### 💰 Quantities & Pricing
+- Parses the client's own stated ratios (e.g. "8 guests per table") instead of assuming defaults
+- Correct minimum-order-quantity handling
+- Multi-day billing derived from whether the brief actually mentions overnight setup
 
-### Human review (`app/resolution.py`, `app/web.py`)
-- **Fully dynamic**: a resolution panel is generated for *any* line that needs a decision, for *any* brief — not a fixed set of hardcoded items. The panel type (dimension inputs, quantity range picker, custom pricing, or "cannot auto-price") is inferred from the line's own review reason and unit.
-- Smart dimension presets: if the brief stated an original width×height ratio before being updated to a new width only, the tool offers "keep original ratio" as a one-click option instead of blank inputs.
-- Every choice auto-applies immediately on selection (no separate "confirm" step needed), and stays visible with a confirmation badge afterwards so the reviewer can always come back and change their mind.
+### ✅ Dynamic Human Review
+- A resolution panel is generated automatically for **any** ambiguous line, on **any** brief — not a fixed set of hardcoded items
+- Smart dimension presets pulled directly from the brief's own text
+- Every decision stays visible and editable after being made
 
-### Proposal generation (`app/proposal.py`)
-- The "Inclusions" section is **built dynamically from what's actually priced** in the quote — it never claims something (like wheelchair ramp compliance or backup power) is included unless a corresponding line is actually in the quote.
-- If a safety-relevant requirement (accessibility, backup power) was requested in the brief but never made it into a priced line, the proposal shows an explicit red warning banner instead of staying silent.
-- Print-safe CSS: category sections are kept together across page breaks, and background colors are forced to print (browsers strip them by default).
-- Branded with the Munginvest logo in the header plus a subtle watermark; export is via "download HTML → browser print to PDF" (Ctrl+P), which preserves exact on-screen styling without any extra PDF library dependency.
+### 📄 Client Proposal
+- The "Inclusions" section is built from what's *actually* priced — never overclaims scope
+- Explicit red warning banner if a safety-relevant requirement (accessibility, backup power) was requested but never priced
+- Fully responsive and print-safe CSS; branded with logo + watermark
+- One click: download HTML → browser print → PDF
+
+### 🔍 Brief Highlights
+- The original brief text, auto color-coded from real extraction data — not a manual summary
+- 🟢 taken literally · 🟡 needed human judgment · 🟣 global requirement confirmed used in pricing · 🔴 adversarial instruction blocked
 
 ---
 
-## Project structure
+## Project Structure
 
 ```
 app/
-├── extractor.py        # LLM brief extraction (Gemini/OpenAI/Ollama)
+├── extractor.py        # LLM brief extraction (Gemini)
 ├── models.py            # Pydantic schema for extraction output
 ├── matcher.py            # Deterministic catalog matching (fan-out design)
 ├── quantities.py         # Deterministic quantity calculation
-├── pricing.py            # Deterministic cost/margin pricing engine
-├── quote_generator.py    # Orchestrates matching → quantities → pricing → flags
-├── quote_models.py       # Pydantic schema for the priced quote
-├── resolution.py          # Human resolution data model + generic builders
-├── review.py               # Review flag aggregation, quote status logic
-├── proposal.py             # Client-facing HTML proposal generation
-├── pipeline.py              # End-to-end orchestration (extraction → quote)
-├── web.py                    # Streamlit UI — upload, review, proposal
-├── catalog.py                  # Recipe catalog loader
-├── pdf_reader.py                # PDF text extraction
-├── cli.py                        # Command-line interface (extract / quote)
-└── assets/                        # Logo & branding images
+├── pricing.py             # Deterministic cost/margin pricing engine
+├── quote_generator.py     # Orchestrates matching → quantities → pricing → flags
+├── quote_models.py         # Pydantic schema for the priced quote
+├── resolution.py             # Human resolution data model + generic builders
+├── review.py                  # Review flag aggregation, quote status logic
+├── proposal.py                 # Client-facing HTML proposal generation
+├── pipeline.py                  # End-to-end orchestration
+├── web.py                        # Streamlit UI — upload, review, proposal
+├── catalog.py                     # Recipe catalog loader
+├── pdf_reader.py                   # PDF text extraction
+├── cli.py                           # Command-line interface
+└── assets/                           # Logo & branding images
 data/
 ├── recipe_catalog.csv    # Product catalog: costs, margins, MOQs
 └── client_brief.pdf       # Sample brief for testing
@@ -119,36 +140,26 @@ tests/                       # Full pytest suite (143+ tests)
 
 ---
 
-## Setup
+## Getting Started
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Set your Gemini API key (one-time, persists across terminal sessions on Windows):
+Set your Gemini API key:
 
 ```bash
-setx GEMINI_API_KEY "your-key-here"
+setx GEMINI_API_KEY "your-key-here"   # Windows, new terminal after
+export GEMINI_API_KEY="your-key-here"  # macOS/Linux
 ```
-*(open a new terminal window after running this)*
 
-## Running
+Run the app:
 
 ```bash
-py -m streamlit run app/web.py --server.headless=true
+streamlit run app/web.py
 ```
 
-Or via the CLI, without the UI:
-
-```bash
-# Extract only
-python -m app.cli extract data/client_brief.pdf -o output/extraction.json
-
-# Full pipeline
-python -m app.cli quote data/client_brief.pdf -o output/quote.json
-```
-
-## Testing
+Run the tests:
 
 ```bash
 pytest tests/ -v
@@ -156,9 +167,17 @@ pytest tests/ -v
 
 ---
 
-## Known limitations (honest, for future work)
+## Honest Limitations
 
-- **LLM non-determinism**: even at `temperature=0.0`, Gemini can occasionally phrase or group observations slightly differently between runs on the same brief — most visible on open-ended requests without a specific number (e.g. "whatever crew you need"). The deterministic layers behave identically given identical extraction output; the extraction step itself is the only non-fully-deterministic part of the pipeline.
-- **No automatic "pick one of several candidate catalog codes"** resolution flow yet — when the matcher genuinely can't disambiguate (e.g. two unrelated catalog rules both fire on one sentence), the reviewer currently must exclude the line and price it manually rather than choosing from the candidate list in the UI.
-- **Capacity-only quantity specs** (e.g. "cocktail tables for ~150 guests standing", with no stated tables-per-guest ratio) don't yet have a dedicated resolution panel — they can be excluded and priced manually outside the tool.
-- Commercial terms (payment terms, cancellation policy, validity period) in the proposal are placeholder boilerplate and should be reviewed against actual company policy before sending to a real client.
+- **LLM non-determinism**: even at `temperature=0.0`, Gemini can occasionally phrase or group observations differently between runs on the same brief — most visible on open-ended requests without a specific number.
+- **No automatic "pick one of several candidate matches"** UI yet — when the matcher genuinely can't disambiguate, the reviewer excludes the line and prices it manually.
+- **Capacity-only quantity specs** (e.g. "tables for ~150 guests standing," no stated ratio) don't yet have a dedicated resolution panel.
+- Commercial terms (payment, cancellation policy) in the proposal are placeholder boilerplate — review before sending to a real client.
+
+---
+
+<div align="center">
+
+Built by **[qusai9898](https://github.com/qusai9898)** — AI-native, top to bottom.
+
+</div>
