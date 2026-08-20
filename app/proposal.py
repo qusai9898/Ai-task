@@ -309,7 +309,7 @@ class ProposalGenerator:
 
         inclusions_html = "".join([f"<li>{inc}</li>" for inc in proposal.notes_and_inclusions])
 
-        header_logo_uri = _logo_data_uri("logo_header.png")
+        header_logo_uri = _logo_data_uri("logo_pro.png")
         header_logo_html = (
             f'<img class="header-logo" src="{header_logo_uri}" alt="Munginvest" />'
             if header_logo_uri else ""

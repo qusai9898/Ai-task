@@ -480,6 +480,7 @@ def _build_highlighted_brief_html(extraction, quote, client_name: str, event_nam
         font-size: 13.5px;
         line-height: 1.85;
         color: #1e293b;
+        white-space: pre-wrap;
     }}
     .email-body span {{
         -webkit-print-color-adjust: exact;
